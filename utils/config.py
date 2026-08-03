@@ -1,7 +1,8 @@
+import torch
 class Config:
     def __init__(self) -> None:
-        self.env_name = "fruit-tree-v0"
-        self.r_dim = 6
+        self.env_name = "minecart-v0"
+        self.r_dim = 3
         self.depth = 6
         self.probscale = 4
         self.new_step_api = False
@@ -9,7 +10,7 @@ class Config:
         self.MO_algo_name = "PreCo"
         self.mode = "train"
         self.seed = 0
-        self.device = "cuda"
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.train_eps = 20
         self.ref_train_eps = 3000
         self.test_eps = 10
@@ -37,7 +38,7 @@ class Config_reacher:
         self.MO_algo_name = "PreCo"
         self.mode = "train" # train or test
         self.seed =0 
-        self.device = "cuda" # device to use
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.train_eps = 40 
         self.ref_train_eps = 800
         self.test_eps = 5

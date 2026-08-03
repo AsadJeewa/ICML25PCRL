@@ -3,7 +3,11 @@ from agent.agent import Agent
 from utils.seed import all_seed
 
 def env_agent_config(cfg):
-    env = mo_gym.make(cfg.env_name, depth=cfg.depth)
+    env_kwargs = {}
+    if hasattr(cfg, "depth") and cfg.depth is not None:
+        env_kwargs["depth"] = cfg.depth
+
+    env = mo_gym.make(cfg.env_name, **env_kwargs)
     print("seed:", cfg.seed)
     all_seed(env, seed=cfg.seed)
     n_states = env.observation_space.shape[0]

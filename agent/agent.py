@@ -1,5 +1,6 @@
 # Add all necessary imports at the top
 import torch
+import os
 import numpy as np
 from torch.distributions import Categorical
 from .models import ActorSoftmax, Critic
@@ -151,7 +152,7 @@ class Agent:
             obj_vec = obj_vec/(obj_vec.norm(dim=-1).reshape(obj_vec.shape[0],1)+0.0001)
             objj = obj_vec.mean(0)
             objj = objj/objj.norm()
-            delta_obj = ref_vec.cuda()-obj_vec.detach()
+            delta_obj = ref_vec-obj_vec.detach()
 
             #print("asfasfsf",delta_obj.norm(dim=-1).sum()>(ref_vec.cuda()-objj).norm())
 
@@ -285,7 +286,7 @@ class Agent:
             obj_vec = obj_vec/(obj_vec.norm(dim=-1).reshape(obj_vec.shape[0],1)+0.0001)
             objj = obj_vec.mean(0)
             objj = objj/objj.norm()
-            delta_obj = ref_vec.cuda()-obj_vec.detach()
+            delta_obj = ref_vec-obj_vec.detach()
 
             #print("asfasfsf",delta_obj.norm(dim=-1).sum()>(ref_vec.cuda()-objj).norm())
 
@@ -411,7 +412,7 @@ class Agent:
             obj_vec = obj_vec/(obj_vec.norm(dim=-1).reshape(obj_vec.shape[0],1)+0.0001)
             objj = obj_vec.mean(0)
             objj = objj/objj.norm()
-            delta_obj = ref_vec.cuda()-obj_vec.detach()
+            delta_obj = ref_vec-obj_vec.detach()
 
             #print("asfasfsf",delta_obj.norm(dim=-1).sum()>(ref_vec.cuda()-objj).norm())
 
@@ -540,7 +541,7 @@ class Agent:
             obj_vec = obj_vec/(obj_vec.norm(dim=-1).reshape(obj_vec.shape[0],1)+0.0001)
             objj = obj_vec.mean(0)
             objj = objj/objj.norm()
-            delta_obj = ref_vec.cuda()-obj_vec.detach()
+            delta_obj = ref_vec-obj_vec.detach()
 
             #print("asfasfsf",delta_obj.norm(dim=-1).sum()>(ref_vec.cuda()-objj).norm())
 
@@ -681,7 +682,7 @@ class Agent:
             obj_vec = obj_vec/(obj_vec.norm(dim=-1).reshape(obj_vec.shape[0],1)+0.0001)
             objj = obj_vec.mean(0)
             objj = objj/objj.norm()
-            delta_obj = ref_vec.cuda()-obj_vec.detach()
+            delta_obj = ref_vec-obj_vec.detach()
 
             #print("asfasfsf",delta_obj.norm(dim=-1).sum()>(ref_vec.cuda()-objj).norm())
 
@@ -817,7 +818,7 @@ class Agent:
             obj_vec = obj_vec/(obj_vec.norm(dim=-1).reshape(obj_vec.shape[0],1)+0.0001)
             objj = obj_vec.mean(0)
             objj = objj/objj.norm()
-            delta_obj = ref_vec.cuda()-obj_vec.detach()
+            delta_obj = ref_vec-obj_vec.detach()
 
             self.ref_diff = (delta_obj.norm(dim=-1)).mean().item()
             asobj = returns/(returns.norm(p=1,dim=-1).reshape(-1,1)+0.0001)+0.0001
@@ -909,4 +910,38 @@ class Agent:
             self.actor_optimizer.step()
             self.critic_optimizer.step()
         self.memory.clear()
+
+    def save(self, save_dir="weights/", filename="checkpoint"):
+        if not os.path.isdir(save_dir):
+            os.makedirs(save_dir)
+
+        saved_params = {
+            "actor_state_dict": self.actor.state_dict(),
+            "critic_state_dict": self.critic.state_dict(),
+            "actor_optimizer_state_dict": self.actor_optimizer.state_dict(),
+            "critic_optimizer_state_dict": self.critic_optimizer.state_dict(),
+            "lam": self.lam,
+        }
+
+        torch.save(
+            saved_params,
+            os.path.join(save_dir, filename + ".tar")
+        )
+
+
+    def load(self, path):
+        params = torch.load(path, map_location=self.device)
+
+        self.actor.load_state_dict(params["actor_state_dict"])
+        self.critic.load_state_dict(params["critic_state_dict"])
+
+        self.actor_optimizer.load_state_dict(
+            params["actor_optimizer_state_dict"]
+        )
+
+        self.critic_optimizer.load_state_dict(
+            params["critic_optimizer_state_dict"]
+        )
+
+        self.lam = params["lam"]
 
