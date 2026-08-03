@@ -14,12 +14,32 @@ def main():
     parser.add_argument("--seed", default=1)
     parser.add_argument("--r", default=6)
     parser.add_argument("--m", default='PreCo')
+    parser.add_argument(
+    "--use_wandb",
+    action="store_true",
+    help="Enable Weights & Biases logging"
+    )
+    parser.add_argument(
+        "--project_name",
+        default="MORL-Baselines",
+        type=str,
+        help="Weights & Biases project name"
+    )
+    parser.add_argument(
+        "--save_checkpoint",
+        action="store_true",
+        help="Save checkpoints"
+        )
+    
     args = parser.parse_args()
 
     cfg = Config()
     cfg.MO_algo_name = args.m
     cfg.seed = int(args.seed)
     cfg.r_dim = int(args.r)
+    cfg.use_wandb = args.use_wandb
+    cfg.project_name = args.project_name
+    cfg.save_checkpoint = args.save_checkpoint  
     env, agent = env_agent_config(cfg)
 
   

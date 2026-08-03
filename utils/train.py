@@ -4,6 +4,9 @@ from utils.test import test, test4, test5, test6
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from pygmo import hypervolume
 import copy
+import wandb
+import os 
+
 testfs = {3: test, 4: test4, 5: test5, 6: test6}
 def compute_sparsity(obj_batch):
     non_dom = NonDominatedSorting().do(obj_batch, only_non_dominated_front=True)
@@ -37,7 +40,20 @@ def train(cfg, env, agent):
     Hv = []
     NRs = []
     SPs = []
-    
+    global_step = 0
+    best_hv = -np.inf
+
+    checkpoint_dir = "checkpoints"
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            name=f"{cfg.MO_algo_name}_{cfg.env_name}_seed{cfg.seed}",
+            config=vars(cfg)
+        )
+
+
     for j in range(cfg.ref_train_eps):
         if j%10==0:
             print(j,"p samples")
@@ -58,6 +74,31 @@ def train(cfg, env, agent):
                 # v = hv.hypervolume(-np.array(mean_rs), ref_point) # deap too slow for 6D
                 Hv.append(v)
                 print("HV:",Hv,"HR:",Hr.mean())
+
+                if cfg.save_checkpoint:
+                    if v > best_hv:
+                        best_hv = v
+
+                        agent.save(
+                            save_dir="checkpoints",
+                            filename=f"best_{cfg.m}_{cfg.env}_seed{cfg.seed}"
+                        )
+
+                        if cfg.use_wandb:
+                            wandb.log({
+                                "best/HV": best_hv
+                            })
+
+                if cfg.use_wandb:
+                # W&B evaluation logging
+                    wandb.log({
+                        "eval/HV": v,
+                        "eval/alignment": Hr.mean(),
+                        "eval/Sparsity": SP,
+                        "eval/Num_Pareto": NR,
+                        "training/ref_episode": j,
+                    })
+
                 print(cfg.seed,"seed",Hr_l)
 #         ref_vec = np.zeros(cfg.r_dim)
 #         ref_vec[np.random.randint(cfg.r_dim)] = 1
@@ -79,6 +120,7 @@ def train(cfg, env, agent):
             ep_step = 0
             state = env.reset()[0]  
             for _ in range(cfg.max_steps):
+                global_step += 1
                 ep_step += 1
                 state = np.concatenate([state,ref_vec])
                 action = agent.sample_action(state)  
@@ -91,6 +133,16 @@ def train(cfg, env, agent):
                 ep_reward += reward 
                 if done:
                     break
+            if cfg.use_wandb:
+                wandb.log({
+                    "train/episode_reward_sum": np.sum(ep_reward),
+                    "train/episode_length": ep_step,
+                    "train/global_step": global_step,
+                    "train/ref_0": ref_vec[0],
+                    "train/ref_1": ref_vec[1] if cfg.r_dim > 1 else 0,
+                    "train/ref_2": ref_vec[2] if cfg.r_dim > 2 else 0,
+                })
+
             if (i_ep+1)%cfg.eval_per_episode == 0:
                 sum_eval_reward = 0
                 for _ in range(cfg.eval_eps):
@@ -108,7 +160,16 @@ def train(cfg, env, agent):
                             break
                     sum_eval_reward += eval_ep_reward
                 mean_eval_reward = sum_eval_reward/cfg.eval_eps
-                
+
+                if cfg.use_wandb:
+                    wandb.log({
+                        "eval/mean_episode_reward": np.sum(mean_eval_reward),
+                        "eval/objective_0": mean_eval_reward[0],
+                        "eval/objective_1": mean_eval_reward[1] if cfg.r_dim > 1 else 0,
+                        "eval/objective_2": mean_eval_reward[2] if cfg.r_dim > 2 else 0,
+                        "training/global_step": global_step
+                    })
+
             steps.append(ep_step)
             rewards.append(ep_reward)
         
@@ -117,6 +178,8 @@ def train(cfg, env, agent):
     print("done!!!!!!!!")
     output_agent = copy.deepcopy(agent) # last agent
     env.close()
+    if cfg.use_wandb:
+        wandb.finish()
     return output_agent,{'rewards':rewards,'ref_vec_list':ref_vec_list},{'Hr':Hr_l,'Rs':RS,'Hv':Hv,'SP':SPs,'NR':NRs}
 
 def train_reacher(cfg, env, agent):
