@@ -3,7 +3,7 @@ class Config:
     def __init__(self) -> None:
         self.env_name = "minecart-v0"
         self.r_dim = 3
-        self.depth = 6
+        # self.depth = 6
         self.probscale = 4
         self.new_step_api = False
         self.algo_name = "PPO"
