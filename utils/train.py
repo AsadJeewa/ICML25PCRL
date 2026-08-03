@@ -97,7 +97,9 @@ def train(cfg, env, agent):
                         "eval/Sparsity": SP,
                         "eval/Num_Pareto": NR,
                         "training/ref_episode": j,
-                    })
+                    },
+                    step=global_step
+                    )
 
                 print(cfg.seed,"seed",Hr_l)
 #         ref_vec = np.zeros(cfg.r_dim)
@@ -141,7 +143,9 @@ def train(cfg, env, agent):
                     "train/ref_0": ref_vec[0],
                     "train/ref_1": ref_vec[1] if cfg.r_dim > 1 else 0,
                     "train/ref_2": ref_vec[2] if cfg.r_dim > 2 else 0,
-                })
+                },
+                step=global_step
+                )
 
             if (i_ep+1)%cfg.eval_per_episode == 0:
                 sum_eval_reward = 0
@@ -168,7 +172,8 @@ def train(cfg, env, agent):
                         "eval/objective_1": mean_eval_reward[1] if cfg.r_dim > 1 else 0,
                         "eval/objective_2": mean_eval_reward[2] if cfg.r_dim > 2 else 0,
                         "training/global_step": global_step
-                    })
+                    },
+                    step=global_step)
 
             steps.append(ep_step)
             rewards.append(ep_reward)
