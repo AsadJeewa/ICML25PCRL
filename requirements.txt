@@ -8,3 +8,5 @@ scipy
 deap
 pygmo
 pymoo 
+wandb
+morl-baselines
