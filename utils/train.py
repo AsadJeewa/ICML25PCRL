@@ -1,13 +1,11 @@
 import torch
 import numpy as np
-from utils.test import test, test4, test5, test6
+from utils.test import test
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
 from morl_baselines.common.performance_indicators import hypervolume, sparsity, expected_utility
 import copy
 import wandb
 import os 
-
-testfs = {3: test, 4: test4, 5: test5, 6: test6}
 
 def compute_metrics(mean_rs, refs, ref_point):
     """
@@ -128,13 +126,12 @@ def train(cfg, env, agent):
             config=vars(cfg)
         )
 
-
-    for j in range(cfg.ref_train_eps): #episodes
-        if j%10==0:
-            print(j,"p samples")
-        if j%100==0:
-            if j>2000:
-                res_dic, mean_rs, refs = testfs[cfg.r_dim](cfg, env, agent)
+    global_step = 0
+    while global_step < cfg.total_timesteps:
+        print(global_step)
+        if global_step%cfg.test_interval==0:
+            if global_step>cfg.test_start:
+                res_dic, mean_rs, refs = test(cfg, env, agent)
 
                 ref_point = cfg.ref_point
 
@@ -158,7 +155,7 @@ def train(cfg, env, agent):
                 NRs.append(nr)
                 EUMs.append(eum)
                 Cardinals.append(cardinality)
-                Hr_l.append((j, alignment))
+                Hr_l.append((global_step, alignment))
 
                 print(
                     "HV:", v,
@@ -192,7 +189,7 @@ def train(cfg, env, agent):
                         "eval/Sparsity": sp,
                         "eval/Cardinality": cardinality,
                         "eval/Non_Dominated_Ratio": nr,
-                        "training/ref_episode": j,
+                        "training/global_step": global_step,
                     },
                     step=global_step)
 
@@ -217,6 +214,8 @@ def train(cfg, env, agent):
             ep_step = 0
             state = env.reset()[0]  
             for _ in range(cfg.max_steps):
+                if global_step >= cfg.total_timesteps:
+                    break
                 global_step += 1
                 ep_step += 1
                 state = np.concatenate([state,ref_vec])
@@ -268,7 +267,8 @@ def train(cfg, env, agent):
                         "eval/objective_2": mean_eval_reward[2] if cfg.r_dim > 2 else 0,
                     },
                     step=global_step)
-
+            if global_step >= cfg.total_timesteps:
+                break
             steps.append(ep_step)
             rewards.append(ep_reward)
         
@@ -309,16 +309,17 @@ def train_reacher(cfg, env, agent):
     EUMs = []
     Cardinals = []
 
-    for j in range(cfg.ref_train_eps):
-        if j%1==0:
-            print(j,"p samples")
-        if j>= 200:
-            agent.entropy_coef/=100
-        if j>= 300:
-            agent.entropy_coef/=10
-        if j%25==0:
-            if j>20:
-                res_dic, mean_rs, refs = testfs[cfg.r_dim](cfg, env, agent)
+    global_step = 0
+
+    while global_step < cfg.total_timesteps:
+        if global_step >= 200:
+            agent.entropy_coef /= 100
+        if global_step >= 300:
+            agent.entropy_coef /= 10
+
+        if global_step % cfg.test_interval == 0:
+            if global_step > cfg.test_start:
+                res_dic, mean_rs, refs = test(cfg, env, agent)
 
                 ref_point = cfg.ref_point
 
@@ -343,7 +344,7 @@ def train_reacher(cfg, env, agent):
                 EUMs.append(eum)
                 Cardinals.append(cardinality)
 
-                Hr_l.append((j, alignment))
+                Hr_l.append((global_step, alignment))
 
                 print(
                     "HV:", v,
@@ -369,12 +370,14 @@ def train_reacher(cfg, env, agent):
         ref_vec /= np.linalg.norm(ref_vec, 2)
        
         ref_vec_list.append(ref_vec)
-        for i_ep in range(cfg.train_eps):
+        for i_ep in range(cfg.train_eps): # run each pref vec for cfg.train_eps episodes
             ep_reward = 0  
             ep_step = 0
             state = env.reset()[0]  
           
             for t_ in range(cfg.max_steps):
+                if global_step >= cfg.total_timesteps:
+                    break
                 ep_step += 1
                 state = np.concatenate([state,ref_vec])
                 action = agent.sample_action(state)  
@@ -414,7 +417,8 @@ def train_reacher(cfg, env, agent):
             steps.append(ep_step)
             rewards.append(ep_reward)
         
-        
+            if global_step >= cfg.total_timesteps:
+                break
      
     print("done!!!!!!!!")
     output_agent = copy.deepcopy(agent) # last agent

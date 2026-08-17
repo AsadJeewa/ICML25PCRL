@@ -13,9 +13,13 @@ class Config:
         self.seed = 0
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.train_eps = 20
-        self.ref_train_eps = 3000
+        # self.ref_train_eps = 3000
+        self.total_timesteps = 1000000
+        self.test_interval = 10000
+        self.test_start = 10000
         self.test_eps = 10
         self.test_res = 10
+        self.num_eval_weights = 1000
         self.max_steps = 100
         self.eval_eps = 5
         self.eval_per_episode = 10
@@ -42,7 +46,10 @@ class Config_reacher:
         self.seed =0 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.train_eps = 40 
-        self.ref_train_eps = 800
+        # self.ref_train_eps = 800
+        self.total_timesteps = 1000000
+        self.test_interval = 10000
+        self.test_start = 10000
         self.test_eps = 5
         self.test_res = 10
         self.max_steps = 250 

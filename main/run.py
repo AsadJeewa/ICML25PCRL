@@ -1,8 +1,7 @@
 import argparse
 from utils.config import Config
 from utils.train import train, compute_metrics
-from utils.test import test, test4, test5, test6
-testfs = {3: test, 4: test4, 5: test5, 6: test6}
+from utils.test import test
 from utils.plot import plot_rewards
 from utils.env import env_agent_config
 import numpy as np
@@ -44,7 +43,7 @@ def main():
   
 
     best_agent, res_dic, Hs = train(cfg, env, agent)
-    res_dic, mean_rs, refs = testfs[cfg.r_dim](cfg, env, best_agent)
+    res_dic, mean_rs, refs = test(cfg, env, best_agent)
 
     metrics = compute_metrics(
         mean_rs,
