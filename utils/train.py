@@ -127,73 +127,75 @@ def train(cfg, env, agent):
         )
 
     global_step = 0
+    next_test_step = cfg.test_start
+
     while global_step < cfg.total_timesteps:
         print(global_step)
-        if global_step%cfg.test_interval==0:
-            if global_step>cfg.test_start:
-                res_dic, mean_rs, refs = test(cfg, env, agent)
+        if global_step >= next_test_step:
+            res_dic, mean_rs, refs = test(cfg, env, agent)
 
-                ref_point = cfg.ref_point
+            ref_point = cfg.ref_point
 
-                RS.append(np.array(mean_rs))
+            RS.append(np.array(mean_rs))
 
-                metrics = compute_metrics(
-                    mean_rs,
-                    refs,
-                    ref_point
-                )
+            metrics = compute_metrics(
+                mean_rs,
+                refs,
+                ref_point
+            )
 
-                v = metrics["HV"]
-                eum = metrics["EUM"]
-                sp = metrics["Sparsity"]
-                cardinality = metrics["Cardinality"]
-                nr = metrics["Non_Dominated_Ratio"]
-                alignment = metrics["Alignment"]
+            v = metrics["HV"]
+            eum = metrics["EUM"]
+            sp = metrics["Sparsity"]
+            cardinality = metrics["Cardinality"]
+            nr = metrics["Non_Dominated_Ratio"]
+            alignment = metrics["Alignment"]
 
-                Hv.append(v)
-                SPs.append(sp)
-                NRs.append(nr)
-                EUMs.append(eum)
-                Cardinals.append(cardinality)
-                Hr_l.append((global_step, alignment))
+            Hv.append(v)
+            SPs.append(sp)
+            NRs.append(nr)
+            EUMs.append(eum)
+            Cardinals.append(cardinality)
+            Hr_l.append((global_step, alignment))
 
-                print(
-                    "HV:", v,
-                    "EUM:", eum,
-                    "Sparsity:", sp,
-                    "Cardinality:", cardinality,
-                    "ND Ratio:", nr,
-                    "Alignment:", alignment
-                )
+            print(
+                "HV:", v,
+                "EUM:", eum,
+                "Sparsity:", sp,
+                "Cardinality:", cardinality,
+                "ND Ratio:", nr,
+                "Alignment:", alignment
+            )
+            next_test_step += cfg.test_interval
 
-                if cfg.save_checkpoint:
-                    if v > best_hv:
-                        best_hv = v
+            if cfg.save_checkpoint:
+                if v > best_hv:
+                    best_hv = v
 
-                        agent.save(
-                            save_dir="checkpoints",
-                            filename=f"best_{cfg.m}_{cfg.env}_seed{cfg.seed}"
-                        )
+                    agent.save(
+                        save_dir="checkpoints",
+                        filename=f"best_{cfg.m}_{cfg.env}_seed{cfg.seed}"
+                    )
 
-                        if cfg.use_wandb:
-                            wandb.log({
-                                "best/HV": best_hv
-                            })
+                    if cfg.use_wandb:
+                        wandb.log({
+                            "best/HV": best_hv
+                        })
 
-                if cfg.use_wandb:
+            if cfg.use_wandb:
                 # W&B evaluation logging
-                    wandb.log({
-                        "eval/HV": v,
-                        "eval/EUM": eum,
-                        "eval/alignment": alignment,
-                        "eval/Sparsity": sp,
-                        "eval/Cardinality": cardinality,
-                        "eval/Non_Dominated_Ratio": nr,
-                        "training/global_step": global_step,
-                    },
-                    step=global_step)
+                wandb.log({
+                    "eval/HV": v,
+                    "eval/EUM": eum,
+                    "eval/alignment": alignment,
+                    "eval/Sparsity": sp,
+                    "eval/Cardinality": cardinality,
+                    "eval/Non_Dominated_Ratio": nr,
+                    "training/global_step": global_step,
+                },
+                step=global_step)
 
-                print(cfg.seed,"seed",Hr_l)
+            print(cfg.seed,"seed",Hr_l)
 #         ref_vec = np.zeros(cfg.r_dim)
 #         ref_vec[np.random.randint(cfg.r_dim)] = 1
         
@@ -310,6 +312,15 @@ def train_reacher(cfg, env, agent):
     Cardinals = []
 
     global_step = 0
+    next_test_step = cfg.test_start
+    best_hv = -np.inf
+
+    if cfg.use_wandb:
+        wandb.init(
+            project=cfg.project_name,
+            name=f"{cfg.MO_algo_name}_{cfg.env_name}_seed{cfg.seed}",
+            config=vars(cfg)
+        )
 
     while global_step < cfg.total_timesteps:
         if global_step >= 200:
@@ -317,44 +328,71 @@ def train_reacher(cfg, env, agent):
         if global_step >= 300:
             agent.entropy_coef /= 10
 
-        if global_step % cfg.test_interval == 0:
-            if global_step > cfg.test_start:
-                res_dic, mean_rs, refs = test(cfg, env, agent)
+        if global_step >= next_test_step:
+            res_dic, mean_rs, refs = test(cfg, env, agent)
 
-                ref_point = cfg.ref_point
+            ref_point = cfg.ref_point
 
-                RS.append(np.array(mean_rs))
+            RS.append(np.array(mean_rs))
 
-                metrics = compute_metrics(
-                    mean_rs,
-                    refs,
-                    ref_point
-                )
+            metrics = compute_metrics(
+                mean_rs,
+                refs,
+                ref_point
+            )
 
-                v = metrics["HV"]
-                eum = metrics["EUM"]
-                sp = metrics["Sparsity"]
-                cardinality = metrics["Cardinality"]
-                nr = metrics["Non_Dominated_Ratio"]
-                alignment = metrics["Alignment"]
+            v = metrics["HV"]
+            eum = metrics["EUM"]
+            sp = metrics["Sparsity"]
+            cardinality = metrics["Cardinality"]
+            nr = metrics["Non_Dominated_Ratio"]
+            alignment = metrics["Alignment"]
 
-                Hv.append(v)
-                SPs.append(sp)
-                NRs.append(nr)
-                EUMs.append(eum)
-                Cardinals.append(cardinality)
+            Hv.append(v)
+            SPs.append(sp)
+            NRs.append(nr)
+            EUMs.append(eum)
+            Cardinals.append(cardinality)
 
-                Hr_l.append((global_step, alignment))
+            Hr_l.append((global_step, alignment))
 
-                print(
-                    "HV:", v,
-                    "EUM:", eum,
-                    "Sparsity:", sp,
-                    "Cardinality:", cardinality,
-                    "ND Ratio:", nr,
-                    "Alignment:", alignment
-                )
-                print(cfg.seed,"seed",Hr_l)
+            print(
+                "HV:", v,
+                "EUM:", eum,
+                "Sparsity:", sp,
+                "Cardinality:", cardinality,
+                "ND Ratio:", nr,
+                "Alignment:", alignment
+            )
+            next_test_step += cfg.test_interval
+
+            if cfg.save_checkpoint:
+                if v > best_hv:
+                    best_hv = v
+
+                    agent.save(
+                        save_dir="checkpoints",
+                        filename=f"best_{cfg.m}_{cfg.env}_seed{cfg.seed}"
+                    )
+
+                    if cfg.use_wandb:
+                        wandb.log({
+                            "best/HV": best_hv
+                        })
+
+            if cfg.use_wandb:
+                wandb.log({
+                    "eval/HV": v,
+                    "eval/EUM": eum,
+                    "eval/alignment": alignment,
+                    "eval/Sparsity": sp,
+                    "eval/Cardinality": cardinality,
+                    "eval/Non_Dominated_Ratio": nr,
+                    "training/global_step": global_step,
+                },
+                step=global_step)
+
+            print(cfg.seed,"seed",Hr_l)
 #         ref_vec = np.zeros(cfg.r_dim)
 #         ref_vec[np.random.randint(cfg.r_dim)] = 1
         
@@ -378,6 +416,7 @@ def train_reacher(cfg, env, agent):
             for t_ in range(cfg.max_steps):
                 if global_step >= cfg.total_timesteps:
                     break
+                global_step += 1
                 ep_step += 1
                 state = np.concatenate([state,ref_vec])
                 action = agent.sample_action(state)  
@@ -394,6 +433,18 @@ def train_reacher(cfg, env, agent):
                 if done:
                     
                     break
+
+            if cfg.use_wandb:
+                wandb.log({
+                    "train/episode_reward_sum": np.sum(ep_reward),
+                    "train/episode_length": ep_step,
+                    "global_step": global_step,
+                    "train/ref_0": ref_vec[0],
+                    "train/ref_1": ref_vec[1] if cfg.r_dim > 1 else 0,
+                    "train/ref_2": ref_vec[2] if cfg.r_dim > 2 else 0,
+                },
+                step=global_step)
+
             if (i_ep+1)%cfg.eval_per_episode == 0:
                 sum_eval_reward = 0
                 for _ in range(1):
@@ -412,7 +463,17 @@ def train_reacher(cfg, env, agent):
                         
                     sum_eval_reward += eval_ep_reward
                 mean_eval_reward = sum_eval_reward
+
                 print(mean_eval_reward,ref_vec)
+
+                if cfg.use_wandb:
+                    wandb.log({
+                        "eval/mean_episode_reward": np.sum(mean_eval_reward),
+                        "eval/objective_0": mean_eval_reward[0],
+                        "eval/objective_1": mean_eval_reward[1] if cfg.r_dim > 1 else 0,
+                        "eval/objective_2": mean_eval_reward[2] if cfg.r_dim > 2 else 0,
+                    },
+                    step=global_step)
                 
             steps.append(ep_step)
             rewards.append(ep_reward)
@@ -423,6 +484,8 @@ def train_reacher(cfg, env, agent):
     print("done!!!!!!!!")
     output_agent = copy.deepcopy(agent) # last agent
     env.close()
+    if cfg.use_wandb:
+        wandb.finish()
     return output_agent, \
     {
         'rewards': rewards,
