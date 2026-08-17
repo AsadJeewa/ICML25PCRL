@@ -2,28 +2,101 @@ import torch
 import numpy as np
 from utils.test import test, test4, test5, test6
 from pymoo.util.nds.non_dominated_sorting import NonDominatedSorting
-from pygmo import hypervolume
+from morl_baselines.common.performance_indicators import hypervolume, sparsity, expected_utility
 import copy
 import wandb
 import os 
 
 testfs = {3: test, 4: test4, 5: test5, 6: test6}
-def compute_sparsity(obj_batch):
-    non_dom = NonDominatedSorting().do(obj_batch, only_non_dominated_front=True)
-    objs = obj_batch[non_dom]
-    ONGVR = np.round(len(non_dom)/len(obj_batch),2)
-    sparsity_sum = 0
-    for objective in range(objs.shape[-1]):
-        objs_sort = np.sort(objs[:,objective])
-        sp = 0
-        for i in range(len(objs_sort)-1):
-            sp +=  np.power(objs_sort[i] - objs_sort[i+1],2)
-        sparsity_sum += sp
-    if len(objs) > 1:
-        sparsity = sparsity_sum/(len(objs)-1)
-    else:
-        sparsity = 0
-    return sparsity, ONGVR
+
+def compute_metrics(mean_rs, refs, ref_point):
+    """
+    Compute evaluation metrics from preference-conditioned returns.
+
+    mean_rs:
+        Achieved return vector for each evaluated preference.
+        Kept in the original maximisation convention.
+
+    refs:
+        Preference vector corresponding to each return.
+
+    ref_point:
+        Hypervolume reference point in the original
+        maximisation convention.
+    """
+
+    returns = np.asarray(mean_rs, dtype=np.float64)
+    refs = np.asarray(refs, dtype=np.float64)
+
+    # ---------------------------------------------------------
+    # Preference alignment
+    # ---------------------------------------------------------
+
+    return_norms = np.linalg.norm(returns, axis=1, keepdims=True)
+    return_norms = np.maximum(return_norms, 1e-12)
+
+    normalised_returns = returns / return_norms
+
+    preference_alignment = np.diag(
+        normalised_returns @ refs.T
+    )
+
+    alignment = preference_alignment.mean()
+
+    # ---------------------------------------------------------
+    # Pareto front
+    # ---------------------------------------------------------
+    # pymoo's NonDominatedSorting assumes minimisation,
+    # so negate returns ONLY for identifying the front.
+
+    obj_values = -returns
+
+    non_dom_idx = NonDominatedSorting().do(
+        obj_values,
+        only_non_dominated_front=True
+    )
+
+    # Keep front in original maximisation convention.
+    pareto_front = returns[non_dom_idx]
+
+    # ---------------------------------------------------------
+    # Hypervolume
+    # ---------------------------------------------------------
+    # MORL-Baselines hypervolume() internally negates both
+    # ref_point and points before passing them to pymoo.
+
+    hv = hypervolume(
+        ref_point=ref_point,
+        points=pareto_front
+    )
+
+    # ---------------------------------------------------------
+    # Sparsity + cardinality
+    # ---------------------------------------------------------
+
+    sp = sparsity(pareto_front)
+    cardinality = len(pareto_front)
+    nr = cardinality / len(returns)
+
+    # ---------------------------------------------------------
+    # Expected Utility
+    # ---------------------------------------------------------
+    # EUM expects maximisation-convention returns.
+
+    eum = expected_utility(
+        front=pareto_front,
+        weights_set=refs
+    )
+
+    return {
+        "HV": hv,
+        "EUM": eum,
+        "Sparsity": sp,
+        "Cardinality": cardinality,
+        "Non_Dominated_Ratio": nr,
+        "Alignment": alignment,
+        "pareto_indices": non_dom_idx,
+    }
 
 def kl_divergence(p, q):
     return np.sum(np.where(p != 0, p * np.log(p / q), 0)) 
@@ -40,6 +113,8 @@ def train(cfg, env, agent):
     Hv = []
     NRs = []
     SPs = []
+    EUMs = []
+    Cardinals = []
     global_step = 0
     best_hv = -np.inf
 
@@ -54,26 +129,45 @@ def train(cfg, env, agent):
         )
 
 
-    for j in range(cfg.ref_train_eps):
+    for j in range(cfg.ref_train_eps): #episodes
         if j%10==0:
             print(j,"p samples")
         if j%100==0:
             if j>2000:
-                res_dic,mean_rs,refs = testfs[cfg.r_dim](cfg, env, agent)
-                ref_point = np.zeros(cfg.r_dim)
+                res_dic, mean_rs, refs = testfs[cfg.r_dim](cfg, env, agent)
+
+                ref_point = cfg.ref_point
+
                 RS.append(np.array(mean_rs))
-                hn = mean_rs/np.linalg.norm(mean_rs,axis=1).reshape(-1,1)
-                Hr = np.diag(np.matmul(hn,np.array(refs).T))
-                Hr_l.append((j,Hr.mean()))
-                SP, NR = compute_sparsity(-np.array(mean_rs))
-                print("SP",SP,"NR",NR)
-                NRs.append(NR)
-                SPs.append(SP)
-                hvfast = hypervolume(-np.array(mean_rs))
-                v = hvfast.compute(np.zeros(cfg.r_dim))
-                # v = hv.hypervolume(-np.array(mean_rs), ref_point) # deap too slow for 6D
+
+                metrics = compute_metrics(
+                    mean_rs,
+                    refs,
+                    ref_point
+                )
+
+                v = metrics["HV"]
+                eum = metrics["EUM"]
+                sp = metrics["Sparsity"]
+                cardinality = metrics["Cardinality"]
+                nr = metrics["Non_Dominated_Ratio"]
+                alignment = metrics["Alignment"]
+
                 Hv.append(v)
-                print("HV:",Hv,"HR:",Hr.mean())
+                SPs.append(sp)
+                NRs.append(nr)
+                EUMs.append(eum)
+                Cardinals.append(cardinality)
+                Hr_l.append((j, alignment))
+
+                print(
+                    "HV:", v,
+                    "EUM:", eum,
+                    "Sparsity:", sp,
+                    "Cardinality:", cardinality,
+                    "ND Ratio:", nr,
+                    "Alignment:", alignment
+                )
 
                 if cfg.save_checkpoint:
                     if v > best_hv:
@@ -93,13 +187,14 @@ def train(cfg, env, agent):
                 # W&B evaluation logging
                     wandb.log({
                         "eval/HV": v,
-                        "eval/alignment": Hr.mean(),
-                        "eval/Sparsity": SP,
-                        "eval/Num_Pareto": NR,
+                        "eval/EUM": eum,
+                        "eval/alignment": alignment,
+                        "eval/Sparsity": sp,
+                        "eval/Cardinality": cardinality,
+                        "eval/Non_Dominated_Ratio": nr,
                         "training/ref_episode": j,
                     },
-                    step=global_step
-                    )
+                    step=global_step)
 
                 print(cfg.seed,"seed",Hr_l)
 #         ref_vec = np.zeros(cfg.r_dim)
@@ -139,7 +234,7 @@ def train(cfg, env, agent):
                 wandb.log({
                     "train/episode_reward_sum": np.sum(ep_reward),
                     "train/episode_length": ep_step,
-                    "train/global_step": global_step,
+                    "global_step": global_step,
                     "train/ref_0": ref_vec[0],
                     "train/ref_1": ref_vec[1] if cfg.r_dim > 1 else 0,
                     "train/ref_2": ref_vec[2] if cfg.r_dim > 2 else 0,
@@ -171,7 +266,6 @@ def train(cfg, env, agent):
                         "eval/objective_0": mean_eval_reward[0],
                         "eval/objective_1": mean_eval_reward[1] if cfg.r_dim > 1 else 0,
                         "eval/objective_2": mean_eval_reward[2] if cfg.r_dim > 2 else 0,
-                        "training/global_step": global_step
                     },
                     step=global_step)
 
@@ -185,7 +279,20 @@ def train(cfg, env, agent):
     env.close()
     if cfg.use_wandb:
         wandb.finish()
-    return output_agent,{'rewards':rewards,'ref_vec_list':ref_vec_list},{'Hr':Hr_l,'Rs':RS,'Hv':Hv,'SP':SPs,'NR':NRs}
+    return output_agent, \
+    {
+        'rewards': rewards,
+        'ref_vec_list': ref_vec_list
+    }, \
+    {
+        'Hr': Hr_l,
+        'Rs': RS,
+        'Hv': Hv,
+        'EUM': EUMs,
+        'SP': SPs,
+        'Cardinality': Cardinals,
+        'NR': NRs
+    }
 
 def train_reacher(cfg, env, agent):
     print("Starting ... ")
@@ -199,7 +306,9 @@ def train_reacher(cfg, env, agent):
     Hv = []
     NRs = []
     SPs = []
-    
+    EUMs = []
+    Cardinals = []
+
     for j in range(cfg.ref_train_eps):
         if j%1==0:
             print(j,"p samples")
@@ -209,24 +318,41 @@ def train_reacher(cfg, env, agent):
             agent.entropy_coef/=10
         if j%25==0:
             if j>20:
-                res_dic,mean_rs,refs = testfs[cfg.r_dim](cfg, env, agent)
-                ref_point = np.zeros(cfg.r_dim)
+                res_dic, mean_rs, refs = testfs[cfg.r_dim](cfg, env, agent)
+
+                ref_point = cfg.ref_point
+
                 RS.append(np.array(mean_rs))
-                hn = mean_rs/np.linalg.norm(mean_rs,axis=1).reshape(-1,1)
-                rn = refs/np.linalg.norm(refs,axis=1).reshape(-1,1)
-                Hr = np.diag(np.matmul(hn,np.array(refs).T))
-                CS = np.diag(np.matmul(hn,np.array(rn).T))
-                Hr_l.append((j,Hr.mean()))
-                SP, NR = compute_sparsity(-np.array(mean_rs))
-                print("SP",SP,"NR",NR,"CS",CS.mean())
-                NRs.append(NR)
-                SPs.append(SP)
-                
-                hvfast = hypervolume(np.clip(-np.array(mean_rs),-999,100))
-                v = hvfast.compute(100*np.ones(cfg.r_dim))
-                # v = hv.hypervolume(-np.array(mean_rs), ref_point) # deap too slow for 6D
+
+                metrics = compute_metrics(
+                    mean_rs,
+                    refs,
+                    ref_point
+                )
+
+                v = metrics["HV"]
+                eum = metrics["EUM"]
+                sp = metrics["Sparsity"]
+                cardinality = metrics["Cardinality"]
+                nr = metrics["Non_Dominated_Ratio"]
+                alignment = metrics["Alignment"]
+
                 Hv.append(v)
-                print("HV:",Hv,"HR:",Hr.mean())
+                SPs.append(sp)
+                NRs.append(nr)
+                EUMs.append(eum)
+                Cardinals.append(cardinality)
+
+                Hr_l.append((j, alignment))
+
+                print(
+                    "HV:", v,
+                    "EUM:", eum,
+                    "Sparsity:", sp,
+                    "Cardinality:", cardinality,
+                    "ND Ratio:", nr,
+                    "Alignment:", alignment
+                )
                 print(cfg.seed,"seed",Hr_l)
 #         ref_vec = np.zeros(cfg.r_dim)
 #         ref_vec[np.random.randint(cfg.r_dim)] = 1
@@ -293,4 +419,17 @@ def train_reacher(cfg, env, agent):
     print("done!!!!!!!!")
     output_agent = copy.deepcopy(agent) # last agent
     env.close()
-    return output_agent,{'rewards':rewards,'ref_vec_list':ref_vec_list},{'Hr':Hr_l,'Rs':RS,'Hv':Hv,'SP':SPs,'NR':NRs}
+    return output_agent, \
+    {
+        'rewards': rewards,
+        'ref_vec_list': ref_vec_list
+    }, \
+    {
+        'Hr': Hr_l,
+        'Rs': RS,
+        'Hv': Hv,
+        'EUM': EUMs,
+        'SP': SPs,
+        'Cardinality': Cardinals,
+        'NR': NRs
+    }
