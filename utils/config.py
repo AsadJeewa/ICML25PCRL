@@ -1,8 +1,10 @@
 import torch
+import numpy as np
+
 class Config:
     def __init__(self) -> None:
         self.env_name = "minecart-v0"
-        self.ref_point = [-1.0, -1.0, 200.0]
+        self.ref_point = np.array([-1.0, -1.0, 200.0])
         self.r_dim = 3
         # self.depth = 6
         self.probscale = 4
