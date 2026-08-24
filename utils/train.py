@@ -129,7 +129,6 @@ def train(cfg, env, agent):
     global_step = 0
     next_test_step = cfg.test_start
 
-    print(cfg.total_timesteps)
     while global_step < cfg.total_timesteps:
         print(global_step)
         if global_step >= next_test_step:
@@ -175,7 +174,7 @@ def train(cfg, env, agent):
 
                     agent.save(
                         save_dir="checkpoints",
-                        filename=f"best_{cfg.m}_{cfg.env}_seed{cfg.seed}"
+                        filename=f"best_{cfg.MO_algo_name}_{cfg.env_name}_seed{cfg.seed}"
                     )
 
                     if cfg.use_wandb:
@@ -373,7 +372,7 @@ def train_reacher(cfg, env, agent):
 
                     agent.save(
                         save_dir="checkpoints",
-                        filename=f"best_{cfg.m}_{cfg.env}_seed{cfg.seed}"
+                        filename=f"best_{cfg.MO_algo_name}_{cfg.env_name}_seed{cfg.seed}"
                     )
 
                     if cfg.use_wandb:
