@@ -38,7 +38,7 @@ class Config:
 class Config_reacher:
     def __init__(self) -> None:
         self.env_name = "mo-reacher-v4"
-        self.ref_point = [-50.0, -50.0, -50.0, -50.0]
+        self.ref_point = np.array([-50.0, -50.0, -50.0, -50.0])
         self.r_dim = 4
         self.probscale = 4
         self.new_step_api = False
