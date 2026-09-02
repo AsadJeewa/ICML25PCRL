@@ -185,12 +185,12 @@ def train(cfg, env, agent):
             if cfg.use_wandb:
                 # W&B evaluation logging
                 wandb.log({
-                    "eval/HV": v,
-                    "eval/EUM": eum,
+                    "eval/hypervolume": v,
+                    "eval/eum": eum,
                     "eval/alignment": alignment,
-                    "eval/Sparsity": sp,
-                    "eval/Cardinality": cardinality,
-                    "eval/Non_Dominated_Ratio": nr,
+                    "eval/sparsity": sp,
+                    "eval/cardinality": cardinality,
+                    "eval/non_dominated_ratio": nr,
                     "training/global_step": global_step,
                 },
                 step=global_step)
@@ -315,6 +315,9 @@ def train_reacher(cfg, env, agent):
     next_test_step = cfg.test_start
     best_hv = -np.inf
 
+    checkpoint_dir = "checkpoints"
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
     if cfg.use_wandb:
         wandb.init(
             project=cfg.project_name,
@@ -382,19 +385,19 @@ def train_reacher(cfg, env, agent):
 
             if cfg.use_wandb:
                 wandb.log({
-                    "eval/HV": v,
-                    "eval/EUM": eum,
+                    "eval/hypervolume": v,
+                    "eval/eum": eum,
                     "eval/alignment": alignment,
-                    "eval/Sparsity": sp,
-                    "eval/Cardinality": cardinality,
-                    "eval/Non_Dominated_Ratio": nr,
+                    "eval/sparsity": sp,
+                    "eval/cardinality": cardinality,
+                    "eval/non_dominated_ratio": nr,
                     "training/global_step": global_step,
                 },
                 step=global_step)
 
             print(cfg.seed,"seed",Hr_l)
-#         ref_vec = np.zeros(cfg.r_dim)
-#         ref_vec[np.random.randint(cfg.r_dim)] = 1
+        # ref_vec = np.zeros(cfg.r_dim)
+        # ref_vec[np.random.randint(cfg.r_dim)] = 1
         
         # 2-D:
         # ref_ang = np.random.rand(cfg.r_dim-1)*np.pi/2
@@ -421,7 +424,6 @@ def train_reacher(cfg, env, agent):
                 state = np.concatenate([state,ref_vec])
                 action = agent.sample_action(state)  
                 next_state, reward, done, _ , _= env.step(action)  
-                #reward = reward[1:]
                 reward = reward[:cfg.r_dim]
                 if t_ == cfg.max_steps-1:
                     done = True
@@ -431,7 +433,6 @@ def train_reacher(cfg, env, agent):
                 ep_reward += reward 
                 
                 if done:
-                    
                     break
 
             if cfg.use_wandb:
@@ -454,17 +455,15 @@ def train_reacher(cfg, env, agent):
                         state = np.concatenate([state,ref_vec])
                         action = agent.greedy_action(state) 
                         next_state, reward, done, _ , _ = env.step(action) 
-                        #reward = reward[1:]
                         reward = reward[:cfg.r_dim]
                         state = next_state  
                         eval_ep_reward += reward  
                         if done:
                             break
-                        
                     sum_eval_reward += eval_ep_reward
                 mean_eval_reward = sum_eval_reward
 
-                print(mean_eval_reward,ref_vec)
+                print(mean_eval_reward, ref_vec)
 
                 if cfg.use_wandb:
                     wandb.log({
@@ -474,15 +473,15 @@ def train_reacher(cfg, env, agent):
                         "eval/objective_2": mean_eval_reward[2] if cfg.r_dim > 2 else 0,
                     },
                     step=global_step)
-                
+
             steps.append(ep_step)
             rewards.append(ep_reward)
-        
+
             if global_step >= cfg.total_timesteps:
                 break
      
     print("done!!!!!!!!")
-    output_agent = copy.deepcopy(agent) # last agent
+    output_agent = copy.deepcopy(agent)
     env.close()
     if cfg.use_wandb:
         wandb.finish()
