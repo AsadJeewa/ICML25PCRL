@@ -966,7 +966,7 @@ class PreCo(MOPolicy, MOAgent):
                         "eval/preference_controllability": ctrl_metrics["preference_controllability"],
                         "eval/local_sensitivity": ctrl_metrics["local_sensitivity"],
                         **{f"eval/{k}": v for k, v in ctrl_metrics.items() if k.startswith("objective_controllability")},
-                    }, step=self.global_step)
+                    })
 
                 if checkpoints:
                     if hv > self.best_hv:
