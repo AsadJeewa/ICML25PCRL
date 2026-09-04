@@ -8,6 +8,7 @@ import numpy as np
 import torch as th
 import wandb
 from pymoo.util.ref_dirs import get_reference_directions
+from scipy.stats import spearmanr
 
 from morl_baselines.common.pareto import filter_pareto_dominated
 from morl_baselines.common.performance_indicators import (
@@ -143,7 +144,6 @@ def policy_evaluation_mo(
     Returns:
         (float, float, np.ndarray, np.ndarray): Avg scalarized return, Avg scalarized discounted return, Avg vectorized return, Avg vectorized discounted return
     """
-    print(w)
     evals = [eval_mo(agent=agent, env=env, w=w, scalarization=scalarization) for _ in range(rep)]
     avg_scalarized_return = np.mean([eval[0] for eval in evals])
     avg_scalarized_discounted_return = np.mean([eval[1] for eval in evals])
@@ -188,7 +188,6 @@ def log_all_multi_policy_metrics(
     sp = sparsity(filtered_front)
     eum = expected_utility(filtered_front, weights_set=equally_spaced_weights(reward_dim, n_sample_weights))
     card = cardinality(filtered_front)
-    print(hv)
     wandb.log(
         {
             "eval/hypervolume": hv,

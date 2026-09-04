@@ -1,6 +1,7 @@
 """PreCo off-policy implementation."""
 
 import os
+import secrets
 from typing import List, Optional, Union
 from typing_extensions import override
 from morl_baselines.common.pareto import filter_pareto_dominated
@@ -14,12 +15,12 @@ import torch.optim as optim
 import wandb
 import random
 import copy
-from sklearn.metrics.pairwise import cosine_similarity
 from morl_baselines.common.buffer import ReplayBuffer
 from morl_baselines.common.evaluation import (
     log_all_multi_policy_metrics,
     log_episode_info,
 )
+from utils.metrics import compute_all_controllability_metrics
 from morl_baselines.common.morl_algorithm import MOAgent, MOPolicy
 from morl_baselines.common.networks import (
     NatureCNN,
@@ -30,7 +31,7 @@ from morl_baselines.common.networks import (
 )
 from morl_baselines.common.prioritized_buffer import PrioritizedReplayBuffer
 from morl_baselines.common.utils import linearly_decaying_value
-from morl_baselines.common.weights import equally_spaced_weights, random_weights,w_test6,w_test4
+from morl_baselines.common.weights import equally_spaced_weights, random_weights
 
 class Qmem:
     def __init__(self, capacity):
@@ -297,9 +298,9 @@ class PreCo(MOPolicy, MOAgent):
         self.lam = 10
         self.exp = 8
         self.Qmem = Qmem(4)
-        
-        seed = 8
-        
+        self.experiment_name = experiment_name
+        self.group = group
+
         random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
         np.random.seed(seed)
@@ -317,6 +318,8 @@ class PreCo(MOPolicy, MOAgent):
      
         self.num_sample_w = num_sample_w
         self.homotopy_lambda = self.initial_homotopy_lambda
+        self.best_hv = -np.inf
+
         print(self.seed,"seed")
         if self.per:
             self.replay_buffer = PrioritizedReplayBuffer(
@@ -365,32 +368,25 @@ class PreCo(MOPolicy, MOAgent):
         }
 
     def save(self, save_replay_buffer: bool = True, save_dir: str = "weights/", filename: Optional[str] = None):
-        """Save the model and the replay buffer if specified.
-
-        Args:
-            save_replay_buffer: Whether to save the replay buffer too.
-            save_dir: Directory to save the model.
-            filename: filename to save the model.
-        """
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
         saved_params = {}
         saved_params["q_net_state_dict"] = self.q_net.state_dict()
-
         saved_params["q_net_optimizer_state_dict"] = self.q_optim.state_dict()
+        saved_params["config"] = {
+            "net_arch": self.net_arch,
+        }
+        saved_params["seed"] = self.seed
         if save_replay_buffer:
             saved_params["replay_buffer"] = self.replay_buffer
         filename = self.experiment_name if filename is None else filename
         th.save(saved_params, save_dir + "/" + filename + ".tar")
 
     def load(self, path: str, load_replay_buffer: bool = True):
-        """Load the model and the replay buffer if specified.
-
-        Args:
-            path: Path to the model.
-            load_replay_buffer: Whether to load the replay buffer too.
-        """
-        params = th.load(path)
+        params = th.load(path, weights_only=False, map_location=self.device)
+        if "config" in params and params["config"]:
+            self.net_arch = params["config"]["net_arch"]
+        self.seed = params.get("seed", None)
         self.q_net.load_state_dict(params["q_net_state_dict"])
         self.target_q_net.load_state_dict(params["q_net_state_dict"])
         self.q_optim.load_state_dict(params["q_net_optimizer_state_dict"])
@@ -827,8 +823,6 @@ class PreCo(MOPolicy, MOAgent):
         return q_values_target
     
    
-    
-    
     def train(
         self,
         total_timesteps: int,
@@ -838,12 +832,17 @@ class PreCo(MOPolicy, MOAgent):
         weight: Optional[np.ndarray] = None,
         total_episodes: Optional[int] = None,
         reset_num_timesteps: bool = True,
-        eval_freq: int = 10000,
+        eval_freq: int = 30000,
         num_eval_weights_for_front: int = 100,
         num_eval_episodes_for_front: int = 5,
         num_eval_weights_for_eval: int = 50,
         reset_learning_starts: bool = False,
+        checkpoints: bool = False,
+        save_freq: int = 100000,
+        warmup_steps: int = 150000,
+        max_episode_steps: int = None,
         verbose: bool = False,
+        eval_weights: Optional[np.ndarray] = None,
     ):
         """Train the agent.
 
@@ -862,6 +861,7 @@ class PreCo(MOPolicy, MOAgent):
             reset_learning_starts: whether to reset the learning starts. Useful when training multiple times.
             verbose: whether to print the episode info.
         """
+        run_id = secrets.token_urlsafe(4)[:6]
         if eval_env is not None:
             assert ref_point is not None, "Reference point must be provided for the hypervolume computation."
         
@@ -879,20 +879,25 @@ class PreCo(MOPolicy, MOAgent):
                     "num_eval_episodes_for_front": num_eval_episodes_for_front,
                     "num_eval_weights_for_eval": num_eval_weights_for_eval,
                     "reset_learning_starts": reset_learning_starts,
+                    "checkpoints": checkpoints,
+                    "save_freq": save_freq,
+                    "warmup_steps": warmup_steps,
+                    "max_episode_steps": max_episode_steps,
+                    "run_id": run_id,
                 }
             )
 
         self.global_step = 0 if reset_num_timesteps else self.global_step
         self.num_episodes = 0 if reset_num_timesteps else self.num_episodes
-        if reset_learning_starts:  # Resets epsilon-greedy exploration
+        if reset_learning_starts:
             self.learning_starts = self.global_step
-        self.env._cached_spec.max_episode_steps = 250
+        if max_episode_steps is not None and hasattr(self.env, '_cached_spec') and self.env._cached_spec is not None:
+            self.env._cached_spec.max_episode_steps = max_episode_steps
         eval_env = copy.deepcopy(self.env)
 
-      
         num_episodes = 0
-        
-        eval_weights = w_test4()#w_test6()
+        if eval_weights is None:
+            eval_weights = equally_spaced_weights(self.reward_dim, n=num_eval_weights_for_front)
         obs, _ = self.env.reset()
 
         w = weight if weight is not None else random_weights(self.reward_dim, 1, dist="gaussian", rng=self.np_random)
@@ -906,45 +911,80 @@ class PreCo(MOPolicy, MOAgent):
                 action = self.env.action_space.sample()
             else:
                 action = self.act(th.as_tensor(obs).float().to(self.device), tensor_w)
-           
+
             next_obs, vec_reward, terminated, truncated, info = self.env.step(action)
-            terminated = False
-            truncated = False
-            if t_%250==0:
-                truncated = True
+            if max_episode_steps is not None:
+                terminated = False
+                truncated = False
+                if t_ % max_episode_steps == 0:
+                    truncated = True
             self.global_step += 1
 
             self.replay_buffer.add(obs, action, vec_reward, next_obs, terminated)
-            if t_%1000==0: 
+            if t_ % 1000 == 0:
                 self.Qmem.append(self.q_net)
             if self.global_step >= self.learning_starts:
                 self.update_preco()
-            if t_%5000==0:
-                if self.lam<=25:
+            if t_ % 5000 == 0:
+                if self.lam <= 25:
                     self.lam += 0.02
-                if self.exp<=15:
+                if self.exp <= 15:
                     self.exp += 0.2
-                print(t_,self.lam,self.exp,self.seed,"seed")
-            if eval_env is not None and self.global_step % 30000 == 0 and t_>=150000:
+                print(t_, self.lam, self.exp, self.seed, "seed")
+
+            if eval_env is not None and self.global_step % eval_freq == 0 and t_ >= warmup_steps:
                 current_front = [
-                    self.policy_eval(eval_env, weights=ew, num_episodes=num_eval_episodes_for_front, log=self.log)[2]
+                    self.policy_eval(eval_env, weights=ew, num_episodes=num_eval_episodes_for_front, log=self.log)[3] #TODO change to 2 later
                     for ew in eval_weights
                 ]
-                
-                filtered_front = list(filter_pareto_dominated(current_front))
-                print(filtered_front)
-                hv = hypervolume(ref_point, filtered_front)
-                hn = np.array(current_front)/np.linalg.norm(np.array(current_front),axis=1).reshape(-1,1)
-                Hr = np.diag(np.matmul(hn,np.array(eval_weights).T))
-                hr = Hr.mean()
-                cs = np.diag(cosine_similarity(np.array(current_front), np.array(eval_weights))).mean()
-                print("HV:",hv,"CS:",cs,"Hr",hr,"step:",t_)
-                lists.append((hv,cs,hr))
+
+                log_all_multi_policy_metrics(
+                    current_front=current_front,
+                    hv_ref_point=ref_point,
+                    reward_dim=self.reward_dim,
+                    global_step=self.global_step,
+                    n_sample_weights=num_eval_weights_for_eval,
+                    ref_front=known_pareto_front,
+                )
+
+                hv = hypervolume(ref_point, list(filter_pareto_dominated(current_front)))
+                print("HV:", hv, "step:", t_)
+                lists.append(hv)
                 print("results:", lists)
                 
+                # controllability metrics
+                ctrl_metrics = compute_all_controllability_metrics(
+                    np.array(eval_weights),
+                    np.array(current_front)
+                )
+                print("Preference controllability:", ctrl_metrics["preference_controllability"])
+                print("Local sensitivity:", ctrl_metrics["local_sensitivity"])
+                print("Objective controllability:", [v for k, v in ctrl_metrics.items() if k.startswith("objective_controllability")])
+
+                if self.log:
+                    wandb.log({
+                        "eval/preference_controllability": ctrl_metrics["preference_controllability"],
+                        "eval/local_sensitivity": ctrl_metrics["local_sensitivity"],
+                        **{f"eval/{k}": v for k, v in ctrl_metrics.items() if k.startswith("objective_controllability")},
+                    }, step=self.global_step)
+
+                if checkpoints:
+                    if hv > self.best_hv:
+                        self.best_hv = hv
+                        self.save(
+                            save_dir="checkpoints",
+                            filename=f"best_{self.experiment_name}_{run_id}_seed{self.seed}"
+                        )
+                        if self.log:
+                            wandb.log({"best/HV": self.best_hv}, step=self.global_step)
+
+            if checkpoints and self.global_step % save_freq == 0:
+                self.save(
+                    save_dir="checkpoints",
+                    filename=f"{self.experiment_name}_{run_id}_seed{self.seed}_step{self.global_step}"
+                )
 
             if terminated or truncated:
-   
                 obs, _ = self.env.reset()
                 num_episodes += 1
                 self.num_episodes += 1
@@ -955,6 +995,5 @@ class PreCo(MOPolicy, MOAgent):
                 if weight is None:
                     w = random_weights(self.reward_dim, 1, dist="gaussian", rng=self.np_random)
                     tensor_w = th.tensor(w).float().to(self.device)
-
             else:
                 obs = next_obs
