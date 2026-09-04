@@ -33,6 +33,8 @@ class Config_OffPolicy(Config):
         self.tau = 1
         self.warmup_steps = 150000
         self.max_episode_steps = None
+        self.per = True
+        self.per_alpha = 0.6
 
 class Config_OnPolicy(Config):
     def __init__(self) -> None:
@@ -143,7 +145,8 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         self.gradient_updates = 2
         self.net_arch = [256, 256]
         self.warmup_steps = 10000
-        
+        self.per = False
+
 class Config_dst_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
         super().__init__()
