@@ -1,3 +1,6 @@
+import numpy as np
+from scipy.stats import spearmanr
+
 def compute_controllability(weights, returns):
     """
     Cosine preference controllability.
