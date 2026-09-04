@@ -1,6 +1,7 @@
 import argparse
-from utils.config import Config_minecart, Config_reacher, Config_dst
+from utils.config import Config_minecart_OnPolicy, Config_reacher_OnPolicy, Config_dst_OnPolicy
 from utils.train import train, train_reacher, compute_metrics
+from utils.metrics import compute_all_controllability_metrics
 from utils.test import test
 from utils.plot import plot_rewards
 from utils.env import env_agent_config, env_agent_config_reacher
@@ -8,11 +9,10 @@ import numpy as np
 import sys
 
 CONFIG_REGISTRY = {
-    "minecart": Config_minecart,
-    "reacher": Config_reacher,
-    "dst": Config_dst,
+    "minecart": Config_minecart_OnPolicy,
+    "reacher": Config_reacher_OnPolicy,
+    "dst": Config_dst_OnPolicy,
 }
-
 TRAIN_REGISTRY = {
     "minecart": train,
     "dst": train,
@@ -27,7 +27,7 @@ ENV_REGISTRY = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed", default=1)
+    parser.add_argument("--seed", default=None, type=int)
     parser.add_argument("--r", default=None, type=int)
     parser.add_argument("--m", default='PreCo')
     parser.add_argument("--env", default="minecart", choices=CONFIG_REGISTRY.keys())
@@ -51,7 +51,8 @@ def main():
 
     cfg = CONFIG_REGISTRY[args.env]()
     cfg.MO_algo_name = args.m
-    cfg.seed = int(args.seed)
+    if args.seed is not None:
+        cfg.seed = int(args.seed)
     if args.r is not None:
         cfg.r_dim = args.r
     cfg.use_wandb = args.use_wandb
@@ -75,6 +76,15 @@ def main():
         "Cardinality:", metrics["Cardinality"],
         "ND Ratio:", metrics["Non_Dominated_Ratio"],
         "Alignment:", metrics["Alignment"]
+    )
+    ctrl_metrics = compute_all_controllability_metrics(
+        np.array(refs),
+        np.array(mean_rs)
+    )
+    print(
+        "Preference controllability:", ctrl_metrics["preference_controllability"],
+        "Local sensitivity:", ctrl_metrics["local_sensitivity"],
+        "Objective controllability:", [v for k, v in ctrl_metrics.items() if k.startswith("objective_controllability")]
     )
     print(cfg.seed, "seed")
 

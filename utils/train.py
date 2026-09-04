@@ -122,7 +122,7 @@ def train(cfg, env, agent):
     if cfg.use_wandb:
         wandb.init(
             project=cfg.project_name,
-            name=f"{cfg.MO_algo_name}_{cfg.env_name}_seed{cfg.seed}",
+            name=f"{cfg.MO_algo_name}_on_policy_{cfg.env_name}_seed{cfg.seed}",
             config=vars(cfg)
         )
 
@@ -130,10 +130,9 @@ def train(cfg, env, agent):
     next_test_step = cfg.test_start
 
     while global_step < cfg.total_timesteps:
-        print(global_step)
         if global_step >= next_test_step:
-            res_dic, mean_rs, refs = test(cfg, env, agent)
 
+            res_dic, mean_rs, refs = test(cfg, env, agent)
             ref_point = cfg.ref_point
 
             RS.append(np.array(mean_rs))
