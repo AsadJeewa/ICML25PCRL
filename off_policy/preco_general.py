@@ -59,6 +59,8 @@ def main():
         log=args.use_wandb,
         project_name=args.project_name,
         experiment_name=experiment_name,
+        per=cfg.per,
+        per_alpha=cfg.per_alpha,
     )
 
     agent.train(
