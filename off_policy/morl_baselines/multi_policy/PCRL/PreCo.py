@@ -15,12 +15,10 @@ import torch.optim as optim
 import wandb
 import random
 import copy
-from morl_baselines.common.buffer import ReplayBuffer
 from morl_baselines.common.evaluation import (
     log_all_multi_policy_metrics,
     log_episode_info,
 )
-from utils.metrics import compute_all_controllability_metrics
 from morl_baselines.common.morl_algorithm import MOAgent, MOPolicy
 from morl_baselines.common.networks import (
     NatureCNN,
@@ -29,9 +27,11 @@ from morl_baselines.common.networks import (
     mlp,
     polyak_update,
 )
-from morl_baselines.common.prioritized_buffer import PrioritizedReplayBuffer
 from morl_baselines.common.utils import linearly_decaying_value
 from morl_baselines.common.weights import equally_spaced_weights, random_weights
+from utils.metrics import compute_all_controllability_metrics
+from off_policy.morl_baselines.common.buffer import ReplayBuffer
+from off_policy.morl_baselines.common.prioritized_buffer import PrioritizedReplayBuffer
 
 class Qmem:
     def __init__(self, capacity):
