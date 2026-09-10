@@ -62,7 +62,7 @@ class Config_minecart_OffPolicy(Config_OffPolicy):
     def __init__(self) -> None:
         super().__init__()
         self.env_name = "minecart-v0"
-        self.ref_point = np.array([-1.0, -1.0, 200.0])
+        self.ref_point = np.array([-1.0, -1.0, -200.0])
         self.r_dim = 3
         self.total_timesteps = 1000000
         self.num_eval_weights = 1000
@@ -72,7 +72,7 @@ class Config_minecart_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
         super().__init__()
         self.env_name = "minecart-v0"
-        self.ref_point = np.array([-1.0, -1.0, 200.0])
+        self.ref_point = np.array([-1.0, -1.0, -200.0])
         self.r_dim = 3
         self.total_timesteps = 1000000
         self.num_eval_weights = 1000
