@@ -7,7 +7,7 @@ class Config:
         self.mode = "train"
         self.seed = 0
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.gamma = 0.99
+        self.gamma = 0.98
         self.num_eval_weights = 100
         self.total_timesteps = 1000000
 
@@ -26,10 +26,10 @@ class Config_OffPolicy(Config):
         self.learning_starts = 1000
         self.gradient_updates = 1
         self.target_net_update_freq = 1000
-        self.net_arch = [256, 256, 256]
+        self.net_arch = [256, 256, 256, 256]
         self.num_eval_episodes_for_front = 5
         self.eval_freq = 10000
-        self.max_grad_norm = 0.1
+        self.max_grad_norm = 1.0
         self.tau = 1
         self.warmup_steps = 150000
         self.max_episode_steps = None
@@ -57,6 +57,7 @@ class Config_OnPolicy(Config):
         self.test_interval = 10000
         self.test_eps = 10
         self.probscale = 4
+        self.net_arch = [256, 256, 256, 256]
 
 class Config_minecart_OffPolicy(Config_OffPolicy):
     def __init__(self) -> None:
@@ -89,7 +90,6 @@ class Config_reacher_OnPolicy(Config_OnPolicy):
         self.env_name = "mo-reacher-v4"
         self.ref_point = np.array([-50.0, -50.0, -50.0, -50.0])
         self.r_dim = 4
-        self.gamma = 0.98
         self.total_timesteps = 1000000
         self.num_eval_weights = 100
         self.train_eps = 40
@@ -121,7 +121,6 @@ class Config_reacher_OffPolicy(Config_OffPolicy):
         self.final_homotopy_lambda = 1.0
         self.homotopy_decay_steps = 10000
         self.learning_starts = 100
-        self.net_arch = [256, 256, 256]
         self.max_episode_steps = 250
 
 class Config_dst_OffPolicy(Config_OffPolicy):
@@ -132,7 +131,7 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         self.r_dim = 2
         self.total_timesteps = 500000
         self.num_eval_weights = 50
-        self.eval_freq = 10000
+        self.eval_freq = 1000
         self.batch_size = 256
         self.buffer_size = int(5e4)
         self.initial_epsilon = 0.5
@@ -146,6 +145,7 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         self.net_arch = [256, 256]
         self.warmup_steps = 10000
         self.per = False
+        self.gamma = 0.99
 
 class Config_dst_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
@@ -160,5 +160,7 @@ class Config_dst_OnPolicy(Config_OnPolicy):
         self.test_eps = 5
         self.test_start = 10000
         self.test_interval = 10000
-        self.eval_freq = 10000
+        self.eval_freq = 1000
         self.entropy_coef = 0.01
+        self.net_arch = [256, 256]
+        self.gamma = 0.99
