@@ -14,7 +14,7 @@ class Config:
 class Config_OffPolicy(Config):
     def __init__(self) -> None:
         super().__init__()
-        self.learning_rate = 3e-4
+        self.learning_rate = 1e-4
         self.batch_size = 256
         self.buffer_size = int(1e6)
         self.initial_epsilon = 1.0
@@ -87,8 +87,8 @@ class Config_minecart_OnPolicy(Config_OnPolicy):
 class Config_reacher_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
         super().__init__()
-        self.env_name = "mo-reacher-v4"
-        self.ref_point = np.array([-50.0, -50.0, -50.0, -50.0])
+        self.env_name = "mo-reacher-v5"
+        self.ref_point = np.array([-100.0, -100.0, -100.0, -100.0])
         self.r_dim = 4
         self.total_timesteps = 1000000
         self.num_eval_weights = 100
@@ -106,14 +106,14 @@ class Config_reacher_OnPolicy(Config_OnPolicy):
 class Config_reacher_OffPolicy(Config_OffPolicy):
     def __init__(self) -> None:
         super().__init__()
-        self.env_name = "mo-reacher-v4"
-        self.ref_point = np.array([-50.0, -50.0, -50.0, -50.0])
+        self.env_name = "mo-reacher-v5"
+        self.ref_point = np.array([-100.0, -100.0, -100.0, -100.0])
         self.r_dim = 4
         self.total_timesteps = 1000000
         self.num_eval_weights = 100
         self.eval_freq = 30000
-        self.batch_size = 64
-        self.buffer_size = int(2e6)
+        self.batch_size = 128
+        self.buffer_size = int(1e6)
         self.initial_epsilon = 1.0
         self.final_epsilon = 0.05
         self.epsilon_decay_steps = 50000
@@ -134,13 +134,13 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         self.eval_freq = 1000
         self.batch_size = 256
         self.buffer_size = int(5e4)
-        self.initial_epsilon = 0.5
-        self.final_epsilon = 0.01
-        self.epsilon_decay_steps = 300000
+        self.initial_epsilon = 1.0
+        self.final_epsilon = 0.05
+        self.epsilon_decay_steps = 400000
         self.initial_homotopy_lambda = 0.2
         self.final_homotopy_lambda = 0.2
         self.homotopy_decay_steps = 500000
-        self.learning_starts = 1000
+        self.learning_starts = 5000
         self.gradient_updates = 2
         self.net_arch = [256, 256]
         self.warmup_steps = 10000
