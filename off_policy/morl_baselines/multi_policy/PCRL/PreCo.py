@@ -15,6 +15,7 @@ import torch.optim as optim
 import wandb
 import random
 import copy
+
 from morl_baselines.common.evaluation import (
     log_all_multi_policy_metrics,
     log_episode_info,
@@ -537,11 +538,11 @@ class PreCo(MOPolicy, MOAgent):
             bili =  v_values/w
             g_s_coef = bili.max(dim=-1).values.view(-1,1)*w-v_values
             g_s_coef_n = g_s_coef/g_s_coef.norm(1,dim=-1,keepdim=True)
-            arcs = th.arccos(F.cosine_similarity(v_values.detach(),w))/3.1416  # ang / pi
+            arcs = th.arccos(th.clamp(F.cosine_similarity(v_values.detach(), w), -1.0 + 1e-7, 1.0 - 1e-7)) / 3.1416
             ratio_LS = th.exp(-self.exp*arcs).unsqueeze(-1)
             sim_coef = ratio_LS*w + (1-ratio_LS)*g_s_coef_n
             # grad 
-            q_val_norm = q_values-q_values.mean(dim=1,keepdim=True)
+            q_val_norm = q_values / (th.norm(q_values, dim=-1, keepdim=True) + 1e-8)
             g_sim = th.einsum("br,bar->ba", sim_coef, q_val_norm)
         
         d = self.solve_min_norm(g_sim, q_val_norm, lam)
@@ -558,8 +559,8 @@ class PreCo(MOPolicy, MOAgent):
     
     @override
     def update_preco(self):
-
         critic_losses = []
+        actor_losses = []
         for g in range(self.gradient_updates):
             if self.per:
                 (
@@ -637,11 +638,10 @@ class PreCo(MOPolicy, MOAgent):
             self.a_optim.zero_grad()
             actor_loss = self.compute_actor_loss(probs, w, self.lam, q_values.detach())
             actor_loss.backward()
+            th.nn.utils.clip_grad_norm_(self.a_net.parameters(), self.max_grad_norm)
             self.a_optim.step()
-            
-            
             critic_losses.append(critic_loss.item())
-
+            actor_losses.append(actor_loss.item())  
             if self.per:
                 td_err = (q_value[: len(b_inds)] - target_q[: len(b_inds)]).detach()
                 priority = th.einsum("sr,sr->s", td_err, w[: len(b_inds)]).abs()
@@ -675,6 +675,7 @@ class PreCo(MOPolicy, MOAgent):
             wandb.log(
                 {
                     "losses/critic_loss": np.mean(critic_losses),
+                    "losses/actor_loss": np.mean(actor_losses), 
                     "metrics/epsilon": self.epsilon,
                     "metrics/homotopy_lambda": self.homotopy_lambda,
                     "global_step": self.global_step,
@@ -682,7 +683,6 @@ class PreCo(MOPolicy, MOAgent):
             )
             if self.per:
                 wandb.log({"metrics/mean_priority": np.mean(priority)})
-    
     
     @override
     def eval(self, obs: np.ndarray, w: np.ndarray) -> int:
@@ -934,7 +934,7 @@ class PreCo(MOPolicy, MOAgent):
 
             if eval_env is not None and self.global_step % eval_freq == 0 and t_ >= warmup_steps:
                 current_front = [
-                    self.policy_eval(eval_env, weights=ew, num_episodes=num_eval_episodes_for_front, log=self.log)[3] #TODO change to 2 later
+                    self.policy_eval(eval_env, weights=ew, num_episodes=num_eval_episodes_for_front, log=self.log)[2] #TODO change to 2 later
                     for ew in eval_weights
                 ]
 
@@ -947,7 +947,8 @@ class PreCo(MOPolicy, MOAgent):
                     ref_front=known_pareto_front,
                 )
 
-                hv = hypervolume(ref_point, list(filter_pareto_dominated(current_front)))
+                filtered_front = list(filter_pareto_dominated(current_front))
+                hv = hypervolume(ref_point, filtered_front)
                 print("HV:", hv, "step:", t_)
                 lists.append(hv)
                 print("results:", lists)
