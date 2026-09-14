@@ -61,6 +61,8 @@ def main():
         experiment_name=experiment_name,
         per=cfg.per,
         per_alpha=cfg.per_alpha,
+        initial_lam=cfg.initial_lam,
+        initial_exp=cfg.initial_exp,
     )
 
     agent.train(
@@ -77,6 +79,7 @@ def main():
         save_freq=100000,
         warmup_steps=cfg.warmup_steps,
         max_episode_steps=cfg.max_episode_steps,
+        known_pareto_front=env.unwrapped.pareto_front(gamma=cfg.gamma) if hasattr(env.unwrapped, 'pareto_front') else None,
     )
 
 if __name__ == "__main__":

@@ -236,6 +236,8 @@ class PreCo(MOPolicy, MOAgent):
         seed: Optional[int] = 10,
         device: Union[th.device, str] = "auto",
         group: Optional[str] = None,
+        initial_lam: float = 10.0,
+        initial_exp: float = 8.0,
     ):
         """Envelope Q-learning algorithm.
 
@@ -296,8 +298,8 @@ class PreCo(MOPolicy, MOAgent):
         self.target_q_net.load_state_dict(self.q_net.state_dict())
         self.target_a_net.load_state_dict(self.a_net.state_dict())
         #self.w_net = w_Adaptor(self.reward_dim).to(self.device)
-        self.lam = 10
-        self.exp = 8
+        self.lam = initial_lam
+        self.exp = initial_exp
         self.Qmem = Qmem(4)
         self.experiment_name = experiment_name
         self.group = group
@@ -937,6 +939,7 @@ class PreCo(MOPolicy, MOAgent):
                     self.policy_eval(eval_env, weights=ew, num_episodes=num_eval_episodes_for_front, log=self.log)[2] #TODO change to 2 later
                     for ew in eval_weights
                 ]
+                print(current_front, "current_front")
 
                 log_all_multi_policy_metrics(
                     current_front=current_front,
