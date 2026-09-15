@@ -637,11 +637,11 @@ class PreCo(MOPolicy, MOAgent):
             # update actor
             a_logits = self.a_net(b_obs, w)
             probs = F.softmax(a_logits,dim=1)
-            self.a_optim.zero_grad()
+            # self.a_optim.zero_grad()
             actor_loss = self.compute_actor_loss(probs, w, self.lam, q_values.detach())
-            actor_loss.backward()
-            th.nn.utils.clip_grad_norm_(self.a_net.parameters(), self.max_grad_norm)
-            self.a_optim.step()
+            # actor_loss.backward()
+            # th.nn.utils.clip_grad_norm_(self.a_net.parameters(), self.max_grad_norm)
+            # self.a_optim.step()
             critic_losses.append(critic_loss.item())
             actor_losses.append(actor_loss.item())  
             if self.per:
