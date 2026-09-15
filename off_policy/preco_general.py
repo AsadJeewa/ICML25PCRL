@@ -40,6 +40,7 @@ def main():
         env,
         max_grad_norm=cfg.max_grad_norm,
         learning_rate=cfg.learning_rate,
+        actor_lr=cfg.actor_lr,
         gamma=cfg.gamma,
         batch_size=cfg.batch_size,
         net_arch=cfg.net_arch,

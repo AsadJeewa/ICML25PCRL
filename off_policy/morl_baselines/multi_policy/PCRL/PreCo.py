@@ -210,6 +210,7 @@ class PreCo(MOPolicy, MOAgent):
         self,
         env,
         learning_rate: float = 3e-4,
+        actor_lr: float = None,
         initial_epsilon: float = 0.01,
         final_epsilon: float = 0.01,
         epsilon_decay_steps: int = None,  # None == fixed epsilon
@@ -316,6 +317,9 @@ class PreCo(MOPolicy, MOAgent):
             param.requires_grad = False
 
         self.q_optim = optim.Adam(self.q_net.parameters(), lr=self.learning_rate)
+        if actor_lr is None:
+            actor_lr = learning_rate
+        self.a_optim = th.optim.Adam(self.a_net.parameters(), lr=actor_lr)
         self.a_optim = optim.Adam(self.a_net.parameters(), lr=self.learning_rate)
         #self.w_optim = optim.Adam(self.w_net.parameters(), lr=self.learning_rate)
      
@@ -637,11 +641,11 @@ class PreCo(MOPolicy, MOAgent):
             # update actor
             a_logits = self.a_net(b_obs, w)
             probs = F.softmax(a_logits,dim=1)
-            # self.a_optim.zero_grad()
+            self.a_optim.zero_grad()
             actor_loss = self.compute_actor_loss(probs, w, self.lam, q_values.detach())
-            # actor_loss.backward()
-            # th.nn.utils.clip_grad_norm_(self.a_net.parameters(), self.max_grad_norm)
-            # self.a_optim.step()
+            actor_loss.backward()
+            th.nn.utils.clip_grad_norm_(self.a_net.parameters(), self.max_grad_norm)
+            self.a_optim.step()
             critic_losses.append(critic_loss.item())
             actor_losses.append(actor_loss.item())  
             if self.per:
