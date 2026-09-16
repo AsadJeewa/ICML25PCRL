@@ -64,6 +64,11 @@ def main():
         per_alpha=cfg.per_alpha,
         initial_lam=cfg.initial_lam,
         initial_exp=cfg.initial_exp,
+        lam_cap=cfg.lam_cap,
+        lam_step=cfg.lam_step,
+        exp_cap=cfg.exp_cap,
+        exp_step=cfg.exp_step,
+        anneal_every=cfg.anneal_every,
     )
 
     agent.train(

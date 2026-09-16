@@ -239,6 +239,11 @@ class PreCo(MOPolicy, MOAgent):
         group: Optional[str] = None,
         initial_lam: float = 10.0,
         initial_exp: float = 8.0,
+        lam_cap: float = 25.0,
+        lam_step: float = 0.02,
+        exp_cap: float = 15.0,
+        exp_step: float = 0.2,
+        anneal_every: int = 5000,
     ):
         """Envelope Q-learning algorithm.
 
@@ -301,6 +306,11 @@ class PreCo(MOPolicy, MOAgent):
         #self.w_net = w_Adaptor(self.reward_dim).to(self.device)
         self.lam = initial_lam
         self.exp = initial_exp
+        self.lam_cap = lam_cap
+        self.lam_step = lam_step
+        self.exp_cap = exp_cap
+        self.exp_step = exp_step
+        self.anneal_every = anneal_every
         self.Qmem = Qmem(4)
         self.experiment_name = experiment_name
         self.group = group
@@ -931,11 +941,11 @@ class PreCo(MOPolicy, MOAgent):
                 self.Qmem.append(self.q_net)
             if self.global_step >= self.learning_starts:
                 self.update_preco()
-            if t_ % 5000 == 0:
-                if self.lam <= 25:
-                    self.lam += 0.02
-                if self.exp <= 15:
-                    self.exp += 0.2
+            if t_ % self.anneal_every == 0:
+                if self.lam <= self.lam_cap:
+                    self.lam += self.lam_step
+                if self.exp <= self.exp_cap:
+                    self.exp += self.exp_step
                 print(t_, self.lam, self.exp, self.seed, "seed")
 
             if eval_env is not None and self.global_step % eval_freq == 0 and t_ >= warmup_steps:

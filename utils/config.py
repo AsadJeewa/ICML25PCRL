@@ -38,6 +38,11 @@ class Config_OffPolicy(Config):
         self.per_alpha = 0.6
         self.initial_lam = 10.0
         self.initial_exp = 8.0
+        self.lam_cap = 25.0
+        self.lam_step = 0.02
+        self.exp_cap = 15.0
+        self.exp_step = 0.2
+        self.anneal_every = 5000
 
 class Config_OnPolicy(Config):
     def __init__(self) -> None:
@@ -153,6 +158,12 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         self.warmup_steps = 10000
         self.initial_lam = 0.5
         self.initial_exp = 2.0
+        # Lower/slower than the default exp_cap=15: a high exp makes ratio_LS in
+        # compute_actor_loss collapse toward the shared ascent direction for any
+        # weight not yet well-aligned with it, which can drag all weights onto
+        # one policy before DST's small critic has learned per-weight values.
+        self.exp_cap = 6.0
+        self.exp_step = 0.05
 
 class Config_dst_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
