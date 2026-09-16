@@ -46,19 +46,12 @@ def eval_mo(
     vec_return, disc_vec_return = np.zeros_like(w), np.zeros_like(w)
     gamma = 1.0
     tt = 0
-    if env.reward_dim == 6:
-        fruit = True
-    else:
-        fruit = False
     while not done:
         if render:
             env.render()
        
         obs, r, terminated, truncated, info = env.step(agent.eval(obs, w))
-        if tt==249:
-            done = True
-        if fruit:
-            done = terminated or truncated
+        done = terminated or truncated
         vec_return += r
         disc_vec_return += gamma * r
         gamma *= agent.gamma
