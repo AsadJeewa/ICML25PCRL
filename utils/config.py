@@ -106,7 +106,7 @@ class Config_minecart_OnPolicy(Config_OnPolicy):
 class Config_reacher_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
         super().__init__()
-        self.env_name = "mo-reacher-v4"
+        self.env_name = "mo-reacher-v5"
         self.ref_point = np.array([-100.0, -100.0, -100.0, -100.0])
         self.r_dim = 4
         self.total_timesteps = 3000000
@@ -122,11 +122,11 @@ class Config_reacher_OnPolicy(Config_OnPolicy):
 class Config_reacher_OffPolicy(Config_OffPolicy):
     def __init__(self) -> None:
         super().__init__()
-        self.env_name = "mo-reacher-v4"
+        self.env_name = "mo-reacher-v5"
         self.ref_point = np.array([-100.0, -100.0, -100.0, -100.0])
         self.r_dim = 4
         self.gamma = 0.98
-        self.total_timesteps = 3000000
+        self.total_timesteps = 2000000
         self.num_eval_weights = 100
         self.eval_freq = 1000
         self.batch_size = 128
