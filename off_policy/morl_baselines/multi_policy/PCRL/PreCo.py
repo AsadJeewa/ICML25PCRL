@@ -244,6 +244,7 @@ class PreCo(MOPolicy, MOAgent):
         exp_cap: float = 15.0,
         exp_step: float = 0.2,
         anneal_every: int = 5000,
+        actor_warmup_steps: int = 0
     ):
         """Envelope Q-learning algorithm.
 
@@ -314,6 +315,7 @@ class PreCo(MOPolicy, MOAgent):
         self.Qmem = Qmem(4)
         self.experiment_name = experiment_name
         self.group = group
+        self.actor_warmup_steps = actor_warmup_steps
 
         random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
@@ -451,7 +453,7 @@ class PreCo(MOPolicy, MOAgent):
 
             with th.no_grad():
                 target = self.ddqn_target(b_next_obs, w)
-                    
+
                 target_q = b_rewards + (1 - b_dones) * self.gamma * target
 
             q_values = self.q_net(b_obs, w)
@@ -612,7 +614,10 @@ class PreCo(MOPolicy, MOAgent):
 
             with th.no_grad():
                 
-                target = self.Preco_Target(b_next_obs, w)
+                if self.global_step < self.actor_warmup_steps:
+                    target = self.ddqn_target(b_next_obs, w)
+                else:
+                    target = self.Preco_Target(b_next_obs, w)
                     
                 target_q = b_rewards + (1 - b_dones) * self.gamma * target
       
@@ -699,13 +704,18 @@ class PreCo(MOPolicy, MOAgent):
             )
             if self.per:
                 wandb.log({"metrics/mean_priority": np.mean(priority)})
-    
     @override
     def eval(self, obs: np.ndarray, w: np.ndarray) -> int:
         obs = th.as_tensor(obs).float().to(self.device)
         w = th.as_tensor(w).float().to(self.device)
-        return self.max_action(obs, w)
-
+        with th.no_grad():
+            if self.global_step < self.actor_warmup_steps:
+                q_values = self.q_net(obs, w)
+                scalarized = th.einsum("r,bar->ba", w, q_values).squeeze(0)
+                return scalarized.argmax().item()
+            else:
+                return self.max_action(obs, w)
+        
     def act(self, obs: th.Tensor, w: th.Tensor) -> int:
         """Epsilon-greedily select an action given an observation and weight.
 
@@ -715,10 +725,21 @@ class PreCo(MOPolicy, MOAgent):
 
         Returns: an integer representing the action to take.
         """
-        a_logits = self.a_net(obs, w)
-        noise = -th.empty_like(a_logits).exponential_().log()  # Gumbel(0,1)
-        ac = (a_logits + noise).argmax(dim=-1)
-        return ac.detach().item()
+        if self.global_step < self.actor_warmup_steps:
+            # Q-greedy exploration during warmup
+            if self.np_random.random() < self.epsilon:
+                return self.env.action_space.sample()
+            with th.no_grad():
+                q_values = self.q_net(obs, w)
+                scalarized = th.einsum("r,bar->ba", w, q_values).squeeze(0)
+                return scalarized.argmax().item()
+        else:
+            # Actor-based exploration after warmup (original PreCo)
+            with th.no_grad():
+                a_logits = self.a_net(obs, w)
+                noise = -th.empty_like(a_logits).exponential_().log()
+                ac = (a_logits + noise).argmax(dim=-1)
+                return ac.detach().item()
 
     @th.no_grad()
     def max_action(self, obs: th.Tensor, w: th.Tensor) -> int:

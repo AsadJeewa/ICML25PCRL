@@ -43,6 +43,7 @@ class Config_OffPolicy(Config):
         self.exp_cap = 15.0
         self.exp_step = 0.2
         self.anneal_every = 5000
+        self.actor_warmup_steps = 0
 
 class Config_OnPolicy(Config):
     def __init__(self) -> None:
@@ -148,9 +149,9 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         self.eval_freq = 1000
         self.net_arch = [256, 256]
         self.buffer_size = int(5e4)
-        self.initial_epsilon = 0.5
+        self.initial_epsilon = 1.0
         self.final_epsilon = 0.01
-        self.epsilon_decay_steps = 300000
+        self.epsilon_decay_steps = 100000
         self.initial_homotopy_lambda = 0.2
         self.final_homotopy_lambda = 0.2
         self.gradient_updates = 2
@@ -164,6 +165,7 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         # one policy before DST's small critic has learned per-weight values.
         self.exp_cap = 6.0
         self.exp_step = 0.05
+        self.actor_warmup_steps = 20000
 
 class Config_dst_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:
