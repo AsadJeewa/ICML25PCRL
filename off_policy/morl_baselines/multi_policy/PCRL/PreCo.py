@@ -382,6 +382,14 @@ class PreCo(MOPolicy, MOAgent):
             "final_homotopy_lambda": self.final_homotopy_lambda,
             "homotopy_decay_steps": self.homotopy_decay_steps,
             "learning_starts": self.learning_starts,
+            "initial_lam": self.lam,
+            "initial_exp": self.exp,
+            "lam_cap": self.lam_cap,
+            "lam_step": self.lam_step,
+            "exp_cap": self.exp_cap,
+            "exp_step": self.exp_step,
+            "anneal_every": self.anneal_every,
+            "actor_warmup_steps": self.actor_warmup_steps,
             "seed": self.seed,
         }
 
@@ -929,14 +937,6 @@ class PreCo(MOPolicy, MOAgent):
                     "warmup_steps": warmup_steps,
                     "max_episode_steps": max_episode_steps,
                     "run_id": run_id,
-                    # "initial_lam": self.lam,
-                    # "initial_exp": self.exp,
-                    # lam_cap: float = 25.0,
-                    # lam_step: float = 0.02,
-                    # exp_cap: float = 15.0,
-                    # exp_step: float = 0.2,
-                    # anneal_every: int = 5000,
-                    # actor_warmup_steps: self.actor_warmup_steps
                 }
             )
 
