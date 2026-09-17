@@ -165,7 +165,7 @@ class Config_dst_OffPolicy(Config_OffPolicy):
         # one policy before DST's small critic has learned per-weight values.
         self.exp_cap = 6.0
         self.exp_step = 0.05
-        self.actor_warmup_steps = 20000
+        self.actor_warmup_steps = self.total_timesteps + 1
 
 class Config_dst_OnPolicy(Config_OnPolicy):
     def __init__(self) -> None:

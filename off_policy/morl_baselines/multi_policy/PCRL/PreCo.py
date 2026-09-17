@@ -331,8 +331,7 @@ class PreCo(MOPolicy, MOAgent):
         self.q_optim = optim.Adam(self.q_net.parameters(), lr=self.learning_rate)
         if actor_lr is None:
             actor_lr = learning_rate
-        self.a_optim = th.optim.Adam(self.a_net.parameters(), lr=actor_lr)
-        self.a_optim = optim.Adam(self.a_net.parameters(), lr=self.learning_rate)
+        self.a_optim = optim.Adam(self.a_net.parameters(), lr=actor_lr)
         #self.w_optim = optim.Adam(self.w_net.parameters(), lr=self.learning_rate)
      
         self.num_sample_w = num_sample_w
@@ -390,8 +389,12 @@ class PreCo(MOPolicy, MOAgent):
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
         saved_params = {}
+        # Critic
         saved_params["q_net_state_dict"] = self.q_net.state_dict()
         saved_params["q_net_optimizer_state_dict"] = self.q_optim.state_dict()
+        # Actor
+        saved_params["a_net_state_dict"] = self.a_net.state_dict()
+        saved_params["a_net_optimizer_state_dict"] = self.a_optim.state_dict()
         saved_params["config"] = {
             "net_arch": self.net_arch,
         }
@@ -406,9 +409,14 @@ class PreCo(MOPolicy, MOAgent):
         if "config" in params and params["config"]:
             self.net_arch = params["config"]["net_arch"]
         self.seed = params.get("seed", None)
+        # Critic
         self.q_net.load_state_dict(params["q_net_state_dict"])
         self.target_q_net.load_state_dict(params["q_net_state_dict"])
         self.q_optim.load_state_dict(params["q_net_optimizer_state_dict"])
+        # Actor
+        self.a_net.load_state_dict(params["a_net_state_dict"])
+        self.target_a_net.load_state_dict(params["a_net_state_dict"])
+        self.a_optim.load_state_dict(params["a_net_optimizer_state_dict"])
         if load_replay_buffer and "replay_buffer" in params:
             self.replay_buffer = params["replay_buffer"]
 
@@ -921,6 +929,14 @@ class PreCo(MOPolicy, MOAgent):
                     "warmup_steps": warmup_steps,
                     "max_episode_steps": max_episode_steps,
                     "run_id": run_id,
+                    # "initial_lam": self.lam,
+                    # "initial_exp": self.exp,
+                    # lam_cap: float = 25.0,
+                    # lam_step: float = 0.02,
+                    # exp_cap: float = 15.0,
+                    # exp_step: float = 0.2,
+                    # anneal_every: int = 5000,
+                    # actor_warmup_steps: self.actor_warmup_steps
                 }
             )
 
