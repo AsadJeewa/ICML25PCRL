@@ -631,7 +631,7 @@ class PreCo(MOPolicy, MOAgent):
             with th.no_grad():
                 
                 if self.global_step < self.actor_warmup_steps:
-                    target = self.ddqn_target(b_next_obs, w)
+                    target = self.envelope_target(b_next_obs, w)
                 else:
                     target = self.Preco_Target(b_next_obs, w)
                     
